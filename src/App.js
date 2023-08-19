@@ -1,101 +1,169 @@
+import React from 'react';
+import { Route, Routes } from 'react-router-dom';
+import axios from 'axios';
+import Header from './components/Header';
+import Drawer from './components/Drawer';
+import AppContext from './pages/context';
+import Orders from './pages/Orders';
+import Home from './pages/Home';
+import Favorites from './pages/Favorites';
+
 function App() {
+  const [items, setItems] = React.useState([]);
+  const [cartItems, setCartItems] = React.useState([]);
+  const [favorites, setFavorites] = React.useState([]);
+  const [searchValue, setSearchValue] = React.useState('');
+  const [cartOpened, setCartOpened] = React.useState(false);
+  const [isLoading, setIsLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    async function fetchData() {
+      try {
+        const [cartResponse, favoritesResponse, itemsResponse] =
+          await Promise.all([
+            axios.get('https://64d4f565b592423e4694f306.mockapi.io/cart'),
+            axios.get('https://64ccf645bb31a268409a2e02.mockapi.io/favorites'),
+            axios.get('https://64d4f565b592423e4694f306.mockapi.io/items'),
+          ]);
+
+        setIsLoading(false);
+        setCartItems(cartResponse.data);
+        setFavorites(favoritesResponse.data);
+        setItems(itemsResponse.data);
+      } catch (error) {
+        alert('Mistake while doing request');
+        console.error(error);
+      }
+    }
+
+    fetchData();
+  }, []);
+
+  const onAddToCart = async (obj) => {
+    try {
+      const findItem = cartItems.find(
+        (item) => Number(item.parentId) === Number(obj.id)
+      );
+      if (findItem) {
+        setCartItems((prev) =>
+          prev.filter((item) => Number(item.parentId) !== Number(obj.id))
+        );
+        await axios.delete(
+          `https://64d4f565b592423e4694f306.mockapi.io/cart/${findItem.id}`
+        );
+      } else {
+        setCartItems((prev) => [...prev, obj]);
+        const { data } = await axios.post(
+          'https://64d4f565b592423e4694f306.mockapi.io/cart',
+          obj
+        );
+        setCartItems((prev) =>
+          prev.map((item) => {
+            if (item.parentId === data.parentId) {
+              return {
+                ...item,
+                id: data.id,
+              };
+            }
+            return item;
+          })
+        );
+      }
+    } catch (error) {
+      alert('Error while adding to cart');
+      console.error(error);
+    }
+  };
+
+  const onRemoveItem = (id) => {
+    try {
+      axios.delete(`https://64d4f565b592423e4694f306.mockapi.io/cart/${id}`);
+      setCartItems((prev) =>
+        prev.filter((item) => Number(item.id) !== Number(id))
+      );
+    } catch (error) {
+      alert('Error while deleting from cart');
+      console.error(error);
+    }
+  };
+
+  const onAddToFavorite = async (obj) => {
+    try {
+      if (favorites.find((favObj) => Number(favObj.id) === Number(obj.id))) {
+        axios.delete(
+          `https://64ccf645bb31a268409a2e02.mockapi.io/favorites/${obj.id}`
+        );
+        setFavorites((prev) =>
+          prev.filter((item) => Number(item.id) !== Number(obj.id))
+        );
+      } else {
+        const { data } = await axios.post(
+          'https://64ccf645bb31a268409a2e02.mockapi.io/favorites',
+          obj
+        );
+        setFavorites((prev) => [...prev, data]);
+      }
+    } catch (error) {
+      alert('Can not add to favorites');
+      console.error(error);
+    }
+  };
+
+  const onChangeSearchInput = (event) => {
+    setSearchValue(event.target.value);
+  };
+
+  const isItemAdded = (id) => {
+    return cartItems.some((obj) => Number(obj.id) === Number(id));
+  };
+
   return (
-    //clear - deletes all unecessary
-    <div className="wrapper clear">
-      {/* header block with 2 headers */}
-      {/* using macro classes from module */}
-      <header className="d-flex justify-between align-center p-40">
-        <div className="d-flex align-center">
-          <img width={40} height={40} src="img/logo.png" />
-          <div className="headerInfo">
-            <h3 classname="text-uppercase">React Sneakers</h3>
-            <p className="opacity-5"> Best Sneakers Shop</p>
-          </div>
+    <AppContext.Provider
+      value={{
+        items,
+        cartItems,
+        favorites,
+        isItemAdded,
+        onAddToFavorite,
+        onAddToCart,
+        setCartOpened,
+        setCartItems,
+      }}
+    >
+      <div className="wrapper clear">
+        <div>
+          <Drawer
+            items={cartItems}
+            onClose={() => setCartOpened(false)}
+            onRemove={onRemoveItem}
+            opened={cartOpened}
+          />
         </div>
 
-        <ul className="d-flex">
-          <li classname="mr-30">
-            <img width={18} height={18} src="img/basket.png" />
-            <span>0 USD</span>
-          </li>
-          <li>
-            <img width={18} height={18} src="img/user.png" />
-          </li>
-        </ul>
-      </header>
-      {/* Main block with sneakers showcase */}
-      <div className="content p-40">
-        <h1 className="mb-40">All sneakers</h1>
-        <div className="d-flex">
-          {/* One item sneaker card */}
-          <div className="card">
-            {/* Photo of sneakers */}
-            <img width={133} height={112} src="img/sneakers/1.png" />
-            <h5>Men's sneakers nikeair-270 for running</h5>
-            <div className="d-flex justify-between">
-              {/* shopping card */}
-              <div className="d-flex flex-column align-center">
-                <span>Price:</span>
-                <b>145USD</b>
-              </div>
-              <button className="button">
-                <img width={11} height={11} src="img/plus.png" alt="Plus" />
-              </button>
-            </div>
-          </div>
-          {/* One item sneaker card */}
-          <div className="card">
-            {/* Photo of sneakers */}
-            <img width={133} height={112} src="img/sneakers/2.png" />
-            <h5>
-              Quality and stylish womens running sneakers Nike Airmax Black
-            </h5>
-            <div className="d-flex justify-between">
-              {/* shopping card */}
-              <div className="d-flex flex-column align-center">
-                <span>Price:</span>
-                <b>80USD</b>
-              </div>
-              <button className="button">
-                <img width={11} height={11} src="img/plus.png" alt="Plus" />
-              </button>
-            </div>
-          </div>
-          {/* One item sneaker card */}
-          <div className="card">
-            {/* Photo of sneakers */}
-            <img width={133} height={112} src="img/sneakers/3.png" />
-            <h5>Best Men's Sneakers for Running Kalenji-100 Gray</h5>
-            <div className="d-flex justify-between">
-              {/* shopping card */}
-              <div className="d-flex flex-column align-center">
-                <span>Price:</span>
-                <b>120USD</b>
-              </div>
-              <button className="button">
-                <img width={11} height={11} src="img/plus.png" alt="Plus" />
-              </button>
-            </div>
-          </div>
-          {/* One item sneaker card */}
-          <div className="card">
-            {/* Photo of sneakers */}
-            <img width={133} height={112} src="img/sneakers/4.png" />
-            <h5>Men's Sneakers Adidas Yeezy 100% original</h5>
-            <div className="d-flex justify-between">
-              {/* shopping card */}
-              <div className="d-flex flex-column align-center">
-                <span>Price:</span>
-                <b>100USD</b>
-              </div>
-              <button className="button">
-                <img width={11} height={11} src="img/plus.png" alt="Plus" />
-              </button>
-            </div>
-          </div>
-        </div>
+        <Header onClickCart={() => setCartOpened(true)} />
+        <Routes>
+          <Route
+            path="/"
+            element={
+              <Home
+                items={items}
+                cartItems={cartItems}
+                searchValue={searchValue}
+                setSearchValue={setSearchValue}
+                onChangeSearchInput={onChangeSearchInput}
+                onAddToFavorite={onAddToFavorite}
+                onAddToCart={onAddToCart}
+                isLoading={isLoading}
+              />
+            }
+            exact
+          />
+
+          <Route path="/favorites" element={<Favorites />} exact />
+          <Route path="/orders" element={<Orders />} exact />
+        </Routes>
       </div>
-    </div>
+    </AppContext.Provider>
   );
 }
 
